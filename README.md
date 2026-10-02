@@ -178,7 +178,13 @@ Omalook uses the Gmail, Google Calendar and People (Contacts) APIs. Google requi
 ### 4. Add yourself as a test user, and publish
 
 1. Open **Audience → Test users → Add users** and add every Gmail address you plan to connect.
-2. **Important:** while the app is in *Testing*, Google expires its sign-in after **7 days**. To avoid re-signing in weekly, click **Publish app** (*In production*). The app stays private to you. Google shows an *unverified app* warning when you sign in, which is expected for your own app: click **Advanced → Go to Omalook (unsafe)**.
+2. **Important:** while the app is in *Testing*, Google expires its sign-in after **7 days**. To avoid re-signing in weekly, publish it:
+   1. Open **Audience** and find **Publishing status** (it says *Testing*).
+   2. Click **Publish app**, then **Confirm**. The status becomes *In production*.
+   3. If you already connected an account while in Testing, remove it in Omalook and add it again so it gets a fresh sign-in.
+   4. When you sign in, Google shows *"Google hasn't verified this app"*. This is expected for your own app: click the small **Advanced** link (bottom left), then **Go to Omalook (unsafe)**, and tick every permission box.
+
+   Publishing doesn't list your app anywhere, but treat the client ID and secret as private: anyone who has them could sign in through your app (Google caps unverified apps at 100 users).
 
 ### 5. Create the OAuth client
 
