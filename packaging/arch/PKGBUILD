@@ -5,7 +5,7 @@ pkgrel=1
 pkgdesc='Outlook-style email, calendar and contacts client for Microsoft 365 and Gmail, themed for Omarchy'
 arch=('x86_64')
 url='https://github.com/nwohater/Omalook'
-license=('unknown')
+license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'glib2')
 makedepends=('rust' 'nodejs' 'npm' 'git' 'librsvg')
 optdepends=('gnome-keyring: store sign-in tokens in the system keyring (otherwise a private file is used)')
@@ -33,6 +33,7 @@ build() {
 package() {
   cd "$pkgname"
   install -Dm755 "$srcdir/target/release/omalook" "$pkgdir/usr/bin/omalook"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 packaging/omalook.desktop "$pkgdir/usr/share/applications/omalook.desktop"
   install -Dm644 packaging/icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omalook.svg"
   for size in 32 128 256 512; do

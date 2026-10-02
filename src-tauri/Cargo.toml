@@ -3,6 +3,7 @@ name = "omalook"
 version = "0.1.0"
 description = "Omalook: a native-feeling Microsoft 365 mail client for Omarchy"
 authors = ["nwohater"]
+license = "MIT"
 edition = "2021"
 
 [lib]

@@ -222,3 +222,7 @@ Layout:
 - `docs/` — the setup guides (rendered in-app and copied into this README)
 
 See [ROADMAP.md](ROADMAP.md) for what's next.
+
+## License
+
+[MIT](LICENSE) © 2026 nwohater
