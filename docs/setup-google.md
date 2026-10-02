@@ -16,6 +16,7 @@ Omalook uses the Gmail, Google Calendar and People (Contacts) APIs. Google requi
 2. **App name:** `Omalook`. **User support email:** your address.
 3. **Audience:** choose **External** (choose **Internal** if you use Google Workspace and only need accounts from your own organization).
 4. Add your email as the contact, then **Create**.
+5. Open **Branding** and fill in only the required fields: **App name**, **User support email** and **Developer contact information**, then **Save**. Leave the logo and the home page / privacy / terms links blank: a logo can trigger Google's verification review, and links require you to verify ownership of the domain.
 
 ### 3. Add the permissions (scopes)
 
