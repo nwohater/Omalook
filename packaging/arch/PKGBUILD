@@ -7,7 +7,7 @@ arch=('x86_64')
 url='https://github.com/nwohater/Omalook'
 license=('unknown')
 depends=('webkit2gtk-4.1' 'gtk3' 'glib2')
-makedepends=('rust' 'nodejs' 'npm' 'git')
+makedepends=('rust' 'nodejs' 'npm' 'git' 'librsvg')
 optdepends=('gnome-keyring: store sign-in tokens in the system keyring (otherwise a private file is used)')
 options=('!lto')
 source=("$pkgname::git+$url.git")
@@ -36,8 +36,7 @@ package() {
   install -Dm644 packaging/omalook.desktop "$pkgdir/usr/share/applications/omalook.desktop"
   install -Dm644 packaging/icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/omalook.svg"
   for size in 32 128 256 512; do
-    rsvg-convert -w $size -h $size packaging/icon.svg -o "icon-$size.png" 2>/dev/null \
-      || cp "src-tauri/icons/128x128.png" "icon-$size.png"
+    rsvg-convert -w $size -h $size packaging/icon.svg -o "icon-$size.png"
     install -Dm644 "icon-$size.png" "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/omalook.png"
   done
 }
