@@ -219,6 +219,12 @@ Paste the client ID and secret into Omalook (**Settings → Accounts → Google*
 | Signed out after a week | The app is still in *Testing* (step 4). Publish it, or just click **Sign in again** when Omalook offers it. |
 | *Publish app* is greyed out | Reload the page after saving **Branding** (step 2), check **User type** is *External*, and make sure you are the project **Owner**. If it still won't enable, stay in Testing and use **Sign in again** each week. |
 
+## Troubleshooting
+
+**The window closes immediately on launch** (and a terminal shows `Error 71 (Protocol error) dispatching to Wayland display`): a WebKitGTK rendering bug on some NVIDIA + Wayland setups. Omalook turns off WebKit's DMABUF renderer at startup to avoid it. If you still see it, run `WEBKIT_DISABLE_DMABUF_RENDERER=1 omalook`, or try `WEBKIT_DISABLE_COMPOSITING_MODE=1 omalook`, and please open an issue.
+
+**Outgoing mail from Microsoft 365 arrives with a `winmail.dat` attachment:** your tenant is sending in Outlook rich-text format. In the Exchange admin center go to *Mail flow → Remote domains → Default → Edit text and character set* and set *Use rich-text format* to **Never**.
+
 ## Development
 
 ```bash
