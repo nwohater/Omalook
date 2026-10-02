@@ -165,7 +165,13 @@ Omalook uses the Gmail, Google Calendar and People (Contacts) APIs. Google requi
 2. **App name:** `Omalook`. **User support email:** your address. (The name is only a label on Google's consent screen, so any name works. If Google won't accept it, try a variation such as `OmaLook Mail`. Where this guide says *Go to Omalook (unsafe)*, use whatever name you chose.)
 3. **Audience:** choose **External** (choose **Internal** if you use Google Workspace and only need accounts from your own organization).
 4. Add your email as the contact, then **Create**.
-5. Open **Branding** and fill in only the required fields: **App name**, **User support email** and **Developer contact information**, then **Save**. Leave the logo and the home page / privacy / terms links blank: a logo can trigger Google's verification review, and links require you to verify ownership of the domain.
+5. Open **Branding** and fill in these fields, then **Save**:
+   - **App name** and **User support email**
+   - **App home page:** `https://github.com/nwohater/Omalook` (your fork's or this repository's URL)
+   - **Privacy policy link:** `https://github.com/nwohater/Omalook/blob/main/PRIVACY.md`
+   - **Developer contact information:** your email
+
+   Google requires the home page and privacy policy to publish the app. Leave the **logo** and **terms of service** blank (a logo can trigger Google's verification review). If Google says the `github.com` domain isn't authorized, add `github.com` under **Authorized domains** on the same page; if it still refuses, host the two pages on a domain you own instead.
 
 ### 3. Add the permissions (scopes)
 
@@ -233,4 +239,4 @@ See [ROADMAP.md](ROADMAP.md) for what's next.
 
 ## License
 
-[MIT](LICENSE) © 2026 nwohater
+[MIT](LICENSE) © 2026 nwohater. See also the [privacy policy](PRIVACY.md).
