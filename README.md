@@ -19,14 +19,32 @@ Built with [Tauri 2](https://tauri.app) (Rust) and Svelte 5.
 
 ## Install
 
+### On an Omarchy / Arch machine (recommended)
+
+Build and install it as a regular pacman package. It appears in your app launcher and uninstalls cleanly.
+
+```bash
+mkdir -p ~/omalook-build && cd ~/omalook-build
+curl -O https://raw.githubusercontent.com/nwohater/Omalook/main/packaging/arch/PKGBUILD
+makepkg -si        # builds from source (a few minutes), then installs with pacman
+```
+
+Update later by running the same two lines again. Remove with `sudo pacman -R omalook`.
+
+**Build once, install on many machines:** `makepkg` leaves an `omalook-*.pkg.tar.zst` file next to the PKGBUILD. Copy it to your other Omarchy machines and run `sudo pacman -U omalook-*.pkg.tar.zst` — no Rust or Node needed there.
+
+**Moving to a new machine:** copy `~/.config/omalook/config.json` (your OAuth client IDs) to the new machine, launch Omalook, and click *Add account* — you'll sign in again once per machine, since tokens stay in that machine's keyring.
+
+### From source (development)
+
 Requirements (Arch / Omarchy): `rust`, `nodejs`, `npm`, `webkit2gtk-4.1`, and a Secret Service provider such as `gnome-keyring` (already present on Omarchy).
 
 ```bash
 git clone git@github.com:nwohater/Omalook.git
 cd Omalook
 npm install
-npm run tauri dev                       # run in development
-npm run tauri build -- --no-bundle      # release binary: src-tauri/target/release/omalook
+npm run tauri dev                  # run in development
+npx tauri build --no-bundle        # release binary: src-tauri/target/release/omalook
 ```
 
 Then follow **Setting up your accounts** below (the same guide is built into the app under *Settings*).
