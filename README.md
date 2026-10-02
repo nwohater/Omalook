@@ -29,6 +29,8 @@ curl -O https://raw.githubusercontent.com/nwohater/Omalook/main/packaging/arch/P
 makepkg -si        # builds from source (a few minutes), then installs with pacman
 ```
 
+If Rust and Node are installed through `mise` rather than pacman, use `makepkg -si --nodeps` so it doesn't try to install the pacman versions.
+
 Update later by running the same two lines again. Remove with `sudo pacman -R omalook`.
 
 **Build once, install on many machines:** `makepkg` leaves an `omalook-*.pkg.tar.zst` file next to the PKGBUILD. Copy it to your other Omarchy machines and run `sudo pacman -U omalook-*.pkg.tar.zst` — no Rust or Node needed there.

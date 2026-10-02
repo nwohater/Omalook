@@ -6,6 +6,6 @@ Comment=Mail, calendar and contacts for Microsoft 365 and Gmail
 Exec=omalook
 Icon=omalook
 Terminal=false
-Categories=Network;Email;Office;Calendar;ContactManagement;
+Categories=Office;Email;Calendar;ContactManagement;
 Keywords=email;mail;outlook;calendar;contacts;gmail;microsoft;
 StartupWMClass=omalook
