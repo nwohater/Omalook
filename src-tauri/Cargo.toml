@@ -1,0 +1,39 @@
+[package]
+name = "omalook"
+version = "0.1.0"
+description = "Omalook: a native-feeling Microsoft 365 mail client for Omarchy"
+authors = ["nwohater"]
+edition = "2021"
+
+[lib]
+name = "omalook_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["net", "io-util", "time", "sync", "fs", "rt-multi-thread", "macros"] }
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+urlencoding = "2"
+tauri-plugin-dialog = "2.8.1"
+mail-builder = "1.0.0"
+mail-parser = "0.11.9"
+futures = "0.3.34"
+dirs = "7.0.0"
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
