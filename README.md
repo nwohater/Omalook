@@ -210,7 +210,8 @@ Paste the client ID and secret into Omalook (**Settings → Accounts → Google*
 | `invalid_client` | Wrong client ID or secret, or the client type isn't *Desktop app*. |
 | `Gmail API has not been used in project…` | Enable the Gmail, Calendar and People APIs (step 1). |
 | *No refresh token* | Remove the account in Omalook, remove Omalook at https://myaccount.google.com/permissions, and add it again. |
-| Signed out after a week | The app is still in *Testing* (step 4). Publish it. |
+| Signed out after a week | The app is still in *Testing* (step 4). Publish it, or just click **Sign in again** when Omalook offers it. |
+| *Publish app* is greyed out | Reload the page after saving **Branding** (step 2), check **User type** is *External*, and make sure you are the project **Owner**. If it still won't enable, stay in Testing and use **Sign in again** each week. |
 
 ## Development
 

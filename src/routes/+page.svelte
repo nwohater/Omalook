@@ -58,6 +58,22 @@
     e.preventDefault();
   }
 
+  // an expired sign-in (e.g. Google "Testing" apps expire weekly) can be renewed in one click
+  let expired = $derived(app.accounts.find((a) => app.error.startsWith("Session expired for ") && app.error.includes(a.email)));
+  let reauthing = $state(false);
+
+  async function reauth() {
+    const a = expired;
+    if (!a) return;
+    reauthing = true;
+    try {
+      await api.addAccount(a.kind);
+      app.error = "";
+      app.mailRev++;
+      location.reload();
+    } catch (e) { fail(e); } finally { reauthing = false; }
+  }
+
   const modes = [
     ["mail", "✉", "Mail (Ctrl+1)"],
     ["calendar", "📅", "Calendar (Ctrl+2)"],
@@ -94,6 +110,7 @@
   {#if app.error}
     <div class="toast bad" role="alert">
       <span>{app.error}</span>
+      {#if expired}<button class="primary" disabled={reauthing} onclick={reauth}>{reauthing ? "Waiting for browser…" : "Sign in again"}</button>{/if}
       <button class="icon" onclick={() => (app.error = "")}>✕</button>
     </div>
   {:else if app.toast}

@@ -73,7 +73,7 @@ async fn session(state: &AppState, id: &str) -> Result<(Account, String), String
         return Ok((account, t.access));
     }
     let app = oauth_app(account.kind)?;
-    let nt = oauth::refresh(&app, &t).await.map_err(|e| format!("Session expired — remove and re-add this account ({e})"))?;
+    let nt = oauth::refresh(&app, &t).await.map_err(|e| format!("Session expired for {} ({e})", account.email))?;
     config::store_tokens(id, &nt)?;
     toks.insert(id.to_string(), nt.clone());
     Ok((account, nt.access))
