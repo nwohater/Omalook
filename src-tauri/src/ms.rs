@@ -154,7 +154,8 @@ pub async fn messages(ctx: &Ctx<'_>, folder: &str, page: Option<String>, search:
 }
 
 const DETAIL_SELECT: &str = "id,subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,body,hasAttachments,isRead,flag,bodyPreview";
-const ATT_EXPAND: &str = "attachments($select=id,name,size,contentType,isInline,contentId)";
+// contentId only exists on fileAttachment, so it can't be selected through the base type
+const ATT_EXPAND: &str = "attachments($select=id,name,size,contentType,isInline)";
 
 async fn message_value(ctx: &Ctx<'_>, id: &str) -> Result<Value, String> {
     http::json(
@@ -170,22 +171,25 @@ async fn html_with_inline(ctx: &Ctx<'_>, id: &str, v: &Value) -> String {
     if !html.contains("cid:") {
         return html;
     }
-    let atts: Vec<&Value> = v["attachments"]
-        .as_array()
-        .map(|a| a.iter().filter(|x| x["contentId"].as_str().is_some() && x["size"].as_u64().unwrap_or(0) < 6_000_000).collect())
-        .unwrap_or_default();
-    let fetched = join_all(atts.iter().map(|a| {
-        let url = format!("/me/messages/{}/attachments/{}/$value", enc(id), enc(&s(&a["id"])));
-        async move { http::bytes(req(ctx, Method::GET, &url)).await }
-    }))
-    .await;
+    // an unselected attachment list includes contentId and contentBytes for file attachments
+    let list = match get(ctx, &format!("/me/messages/{}/attachments?$top=50", enc(id))).await {
+        Ok(l) => l,
+        Err(_) => return html,
+    };
+    let map = inline_images(&list);
+    replace_cids(&html, &map)
+}
+
+/// Map `cid` → (content type, bytes) from a full attachment listing.
+fn inline_images(list: &Value) -> HashMap<String, (String, Vec<u8>)> {
     let mut map = HashMap::new();
-    for (a, data) in atts.iter().zip(fetched) {
-        if let Ok(d) = data {
-            map.insert(s(&a["contentId"]).trim_matches(|c| c == '<' || c == '>').to_string(), (s(&a["contentType"]), d));
+    for a in list["value"].as_array().into_iter().flatten() {
+        let (Some(cid), Some(data)) = (a["contentId"].as_str(), a["contentBytes"].as_str()) else { continue };
+        if let Ok(bytes) = STANDARD.decode(data) {
+            map.insert(cid.trim_matches(|c| c == '<' || c == '>').to_string(), (s(&a["contentType"]), bytes));
         }
     }
-    replace_cids(&html, &map)
+    map
 }
 
 fn attachments_of(v: &Value) -> Vec<Attachment> {
@@ -546,4 +550,26 @@ pub async fn save_contact(ctx: &Ctx<'_>, c: &Contact) -> Result<(), String> {
 pub async fn delete_contact(ctx: &Ctx<'_>, id: &str) -> Result<(), String> {
     http::json(req(ctx, Method::DELETE, &format!("/me/contacts/{}", enc(id)))).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_inline_image_map() {
+        let list = json!({ "value": [
+            { "contentId": "<logo@x>", "contentType": "image/png", "contentBytes": "AQID" },
+            { "contentType": "application/pdf", "contentBytes": "AAAA" },
+            { "contentId": "bad", "contentType": "image/png" }
+        ]});
+        let m = inline_images(&list);
+        assert_eq!(m.len(), 1);
+        assert_eq!(m["logo@x"], ("image/png".to_string(), vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn expand_never_selects_contentid() {
+        assert!(!ATT_EXPAND.contains("contentId"));
+    }
 }
