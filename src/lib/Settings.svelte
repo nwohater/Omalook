@@ -148,6 +148,7 @@
           <tr><td><kbd>!</kbd></td><td>Mark as junk</td></tr>
           <tr><td><kbd>u</kbd> <kbd>f</kbd></td><td>Toggle read / flag</td></tr>
           <tr><td><kbd>/</kbd></td><td>Search</td></tr>
+          <tr><td><kbd>F5</kbd> <kbd>F9</kbd></td><td>Check for new mail</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Edit the selected draft (in Drafts)</td></tr>
           <tr><th colspan="2">Composer</th></tr>
           <tr><td><kbd>Ctrl+Enter</kbd></td><td>Send</td></tr>

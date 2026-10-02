@@ -153,6 +153,19 @@
     untrack(() => { refreshFolders(); if (inDrafts || folder?.role === "sent") load(false); });
   });
 
+  /** Manual "check for mail": refresh folder counts and re-read the current folder. */
+  async function refreshNow() {
+    if (!folderId || refreshing) return;
+    const before = new Set(msgs.map((m) => m.id));
+    refreshing = true;
+    lastSync = Date.now();
+    try {
+      await Promise.all([refreshFolders(), load(false)]);
+      const fresh = msgs.filter((m) => !before.has(m.id)).length;
+      flash(fresh ? `${fresh} new message${fresh > 1 ? "s" : ""}` : "Up to date");
+    } finally { refreshing = false; }
+  }
+
   // coming back from Calendar/Contacts/Settings: pull new mail if it's been a while
   $effect(() => {
     if (app.mode !== "mail" || app.settings) return;
@@ -303,6 +316,7 @@
 
   function onKey(e: KeyboardEvent) {
     if (app.mode !== "mail" || app.compose || app.settings) return;
+    if (e.key === "F5" || e.key === "F9") { e.preventDefault(); refreshNow(); return; }
     const t = e.target as HTMLElement;
     if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
     const m = msgs[index];
@@ -372,7 +386,10 @@
 
   <section class="list">
     <header>
-      <h2>{folder?.name ?? ""}{#if loading || refreshing || loadingFolders}<span class="spinner small" title="Refreshing…"></span>{/if}</h2>
+      <div class="titlebar">
+        <h2>{folder?.name ?? ""}{#if loading || refreshing || loadingFolders}<span class="spinner small" title="Refreshing…"></span>{/if}</h2>
+        <button class="icon refresh" title="Check for new mail (F5)" disabled={!folderId || refreshing} onclick={refreshNow}>⟳</button>
+      </div>
       {#if loading || refreshing || loadingFolders}<div class="progress"></div>{/if}
       <input bind:this={searchEl} bind:value={search} placeholder="Search  ( / )" onkeydown={(e) => e.key === "Enter" && load(false)} />
     </header>
@@ -471,6 +488,9 @@
   .list header { padding: 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
   .list h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 10px; }
   .list header { position: relative; }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; }
+  .refresh { font-size: 18px; line-height: 1; padding: 2px 8px; }
+  .refresh:disabled { opacity: 0.4; }
   .progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; background: transparent; }
   .progress::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
   @keyframes slide { from { left: -35%; } to { left: 100%; } }

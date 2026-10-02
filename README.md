@@ -43,6 +43,7 @@ Then follow **Setting up your accounts** below (the same guide is built into the
 | `!` | Mark as junk |
 | `u` / `f` | Toggle read / flag |
 | `/` | Search |
+| `F5` / `F9` | Check for new mail |
 | `Enter` | Edit the selected draft |
 | `Ctrl+Enter` / `Ctrl+S` / `Esc` | Composer: send / save draft / save and close |
 | `Ctrl+1` `2` `3` | Mail / Calendar / Contacts |
