@@ -3,7 +3,7 @@ use crate::http::{self, Ctx};
 use crate::model::*;
 use crate::util::*;
 use base64::{engine::general_purpose::STANDARD, Engine};
-use futures::future::{join_all, BoxFuture};
+use futures::future::join_all;
 use reqwest::{Method, RequestBuilder};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -61,50 +61,64 @@ fn role_rank(role: &str) -> u8 {
     ["inbox", "drafts", "sent", "archive", "trash", "junk"].iter().position(|r| *r == role).unwrap_or(99) as u8
 }
 
-fn walk<'a>(
-    ctx: &'a Ctx<'a>,
-    parent: Option<String>,
-    depth: u32,
-    roles: &'a HashMap<String, &'static str>,
-    out: &'a mut Vec<Folder>,
-) -> BoxFuture<'a, Result<(), String>> {
-    Box::pin(async move {
-        let mut items = children(ctx, parent.as_deref()).await?;
-        if depth == 0 {
-            items.sort_by_key(|v| (role_rank(roles.get(&s(&v["id"])).copied().unwrap_or("other")), s(&v["displayName"]).to_lowercase()));
-        } else {
-            items.sort_by_key(|v| s(&v["displayName"]).to_lowercase());
-        }
-        for v in items {
-            let id = s(&v["id"]);
-            out.push(Folder {
-                id: id.clone(),
-                name: s(&v["displayName"]),
-                role: roles.get(&id).copied().unwrap_or("other").to_string(),
-                unread: u(&v["unreadItemCount"]),
-                total: u(&v["totalItemCount"]),
-                depth,
-            });
-            if u(&v["childFolderCount"]) > 0 && depth < 4 {
-                walk(ctx, Some(id), depth + 1, roles, out).await?;
-            }
-        }
-        Ok(())
-    })
+fn folder_of(v: &Value, depth: u32, roles: &HashMap<String, &'static str>) -> Folder {
+    let id = s(&v["id"]);
+    Folder {
+        role: roles.get(&id).copied().unwrap_or("other").to_string(),
+        name: s(&v["displayName"]),
+        unread: u(&v["unreadItemCount"]),
+        total: u(&v["totalItemCount"]),
+        depth,
+        id,
+    }
+}
+
+/// Emit `items` and, recursively, their children (already fetched into `kids`), depth-first.
+fn emit(items: Vec<Value>, depth: u32, kids: &mut HashMap<String, Vec<Value>>, roles: &HashMap<String, &'static str>, out: &mut Vec<Folder>) {
+    for v in items {
+        let f = folder_of(&v, depth, roles);
+        let mut sub = kids.remove(&f.id).unwrap_or_default();
+        out.push(f);
+        sub.sort_by_key(|c| s(&c["displayName"]).to_lowercase());
+        emit(sub, depth + 1, kids, roles, out);
+    }
 }
 
 pub async fn folders(ctx: &Ctx<'_>) -> Result<Vec<Folder>, String> {
     let aliases = [("inbox", "inbox"), ("drafts", "drafts"), ("sentitems", "sent"), ("archive", "archive"), ("deleteditems", "trash"), ("junkemail", "junk")];
     let paths: Vec<String> = aliases.iter().map(|(a, _)| format!("/me/mailFolders/{a}?$select=id")).collect();
-    let results = join_all(paths.iter().map(|p| get(ctx, p))).await;
+
+    // role lookups and the top-level listing are independent: run them together
+    let (results, top) = futures::join!(join_all(paths.iter().map(|p| get(ctx, p))), children(ctx, None));
     let mut roles: HashMap<String, &'static str> = HashMap::new();
     for ((_, role), r) in aliases.iter().zip(results) {
         if let Ok(v) = r {
             roles.insert(s(&v["id"]), role);
         }
     }
+
+    // fetch each level of subfolders in parallel instead of one parent at a time
+    let top = top?;
+    let mut kids: HashMap<String, Vec<Value>> = HashMap::new();
+    let mut frontier: Vec<String> = top.iter().filter(|v| u(&v["childFolderCount"]) > 0).map(|v| s(&v["id"])).collect();
+    for _ in 0..4 {
+        if frontier.is_empty() {
+            break;
+        }
+        let fetched = join_all(frontier.iter().map(|id| children(ctx, Some(id)))).await;
+        let mut next = vec![];
+        for (id, r) in frontier.iter().zip(fetched) {
+            let list = r?;
+            next.extend(list.iter().filter(|v| u(&v["childFolderCount"]) > 0).map(|v| s(&v["id"])));
+            kids.insert(id.clone(), list);
+        }
+        frontier = next;
+    }
+
+    let mut top = top;
+    top.sort_by_key(|v| (role_rank(roles.get(&s(&v["id"])).copied().unwrap_or("other")), s(&v["displayName"]).to_lowercase()));
     let mut out = vec![];
-    walk(ctx, None, 0, &roles, &mut out).await?;
+    emit(top, 0, &mut kids, &roles, &mut out);
     Ok(out)
 }
 
@@ -566,6 +580,19 @@ mod tests {
         let m = inline_images(&list);
         assert_eq!(m.len(), 1);
         assert_eq!(m["logo@x"], ("image/png".to_string(), vec![1, 2, 3]));
+    }
+
+    #[test]
+    fn flattens_folder_tree_depth_first() {
+        let f = |id: &str, name: &str| json!({ "id": id, "displayName": name, "childFolderCount": 0 });
+        let mut kids = HashMap::new();
+        kids.insert("sync".to_string(), vec![f("srv", "Server Failures"), f("con", "Conflicts")]);
+        let roles: HashMap<String, &'static str> = [("inbox".to_string(), "inbox")].into();
+        let mut out = vec![];
+        emit(vec![f("inbox", "Inbox"), f("sync", "Sync Issues"), f("rss", "RSS")], 0, &mut kids, &roles, &mut out);
+        let order: Vec<(&str, u32)> = out.iter().map(|x| (x.name.as_str(), x.depth)).collect();
+        assert_eq!(order, [("Inbox", 0), ("Sync Issues", 0), ("Conflicts", 1), ("Server Failures", 1), ("RSS", 0)]);
+        assert_eq!(out[0].role, "inbox");
     }
 
     #[test]

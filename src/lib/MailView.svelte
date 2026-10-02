@@ -22,6 +22,43 @@
   let searchEl = $state<HTMLInputElement>();
   let frameEl = $state<HTMLIFrameElement>();
   let epoch = 0;
+  let expanded = $state<string[]>([]);
+  let loadingFolders = $state(false);
+  let refreshing = $state(false);
+  let lastSync = 0;
+
+  // last-seen state per account, so switching accounts is instant and refreshes in the background
+  type Snap = { folders: Folder[]; folderId: string; msgs: MsgSummary[]; next: string | null };
+  const cache = new Map<string, Snap>();
+  function snapshot() {
+    if (app.activeId && folders.length) cache.set(app.activeId, { folders: $state.snapshot(folders), folderId, msgs: $state.snapshot(msgs), next });
+  }
+
+  const storeKey = () => `omalook.expanded.${app.activeId}`;
+  function loadExpanded() {
+    try { expanded = JSON.parse(localStorage.getItem(storeKey()) ?? "[]"); } catch { expanded = []; }
+  }
+  function toggleFolder(id: string) {
+    expanded = expanded.includes(id) ? expanded.filter((x) => x !== id) : [...expanded, id];
+    try { localStorage.setItem(storeKey(), JSON.stringify(expanded)); } catch { /* storage unavailable */ }
+  }
+
+  // folders arrive depth-first; hide everything under a collapsed parent
+  let tree = $derived.by(() => {
+    const out: { f: Folder; parent: boolean; open: boolean }[] = [];
+    let hideBelow: number | null = null;
+    folders.forEach((f, i) => {
+      if (hideBelow !== null) {
+        if (f.depth > hideBelow) return;
+        hideBelow = null;
+      }
+      const parent = (folders[i + 1]?.depth ?? 0) > f.depth;
+      const open = expanded.includes(f.id);
+      out.push({ f, parent, open });
+      if (parent && !open) hideBelow = f.depth;
+    });
+    return out;
+  });
 
   let account = $derived(app.accounts.find((a) => a.id === app.activeId));
   let folder = $derived(folders.find((f) => f.id === folderId));
@@ -33,21 +70,32 @@
   async function boot() {
     const id = app.activeId;
     epoch++;
-    folders = []; msgs = []; selected = null; selectedId = ""; next = null; folderId = "";
+    selected = null; selectedId = "";
+    loadExpanded();
+    const c = cache.get(id);
+    if (c) { folders = c.folders; folderId = c.folderId; msgs = c.msgs; next = c.next; }
+    else { folders = []; msgs = []; next = null; folderId = ""; }
     if (!id) return;
+    if (c) refreshing = true; else loadingFolders = true;
     try {
       const f = await api.folders(id);
       if (id !== app.activeId) return;
       folders = f;
-      const inbox = f.find((x) => x.role === "inbox") ?? f[0];
-      if (inbox) await openFolder(inbox.id);
+      lastSync = Date.now();
+      if (f.some((x) => x.id === folderId)) await load(false); // revalidate what's on screen
+      else {
+        const inbox = f.find((x) => x.role === "inbox") ?? f[0];
+        if (inbox) await openFolder(inbox.id);
+      }
     } catch (e) { fail(e); }
+    finally { if (id === app.activeId) { refreshing = false; loadingFolders = false; } }
   }
 
   async function openFolder(id: string) {
     folderId = id;
     search = "";
     selected = null; selectedId = "";
+    msgs = []; next = null;
     await load(false);
   }
 
@@ -60,7 +108,7 @@
       msgs = more ? [...msgs, ...r.items.filter((n) => !msgs.some((m) => m.id === n.id))] : r.items;
       next = r.next;
     } catch (e) { if (my === epoch) fail(e); }
-    finally { if (my === epoch) loading = false; }
+    finally { if (my === epoch) { loading = false; snapshot(); } }
   }
 
   async function refreshFolders() {
@@ -105,8 +153,19 @@
     untrack(() => { refreshFolders(); if (inDrafts || folder?.role === "sent") load(false); });
   });
 
+  // coming back from Calendar/Contacts/Settings: pull new mail if it's been a while
+  $effect(() => {
+    if (app.mode !== "mail" || app.settings) return;
+    untrack(() => {
+      if (!folderId || Date.now() - lastSync < 20_000) return;
+      lastSync = Date.now();
+      refreshing = true;
+      poll().finally(() => (refreshing = false));
+    });
+  });
+
   onMount(() => {
-    const t = setInterval(poll, 60_000);
+    const t = setInterval(() => { lastSync = Date.now(); poll(); }, 60_000);
     return () => clearInterval(t);
   });
 
@@ -293,19 +352,28 @@
     </div>
     <button class="primary compose" onclick={() => openCompose()}>✏️ New message</button>
     <nav>
-      {#each folders as f (f.id)}
-        <button class="folder" class:active={f.id === folderId} style:padding-left="{10 + f.depth * 14}px" onclick={() => openFolder(f.id)}>
-          <span class="ico">{ICONS[f.role] ?? "📁"}</span>
-          <span class="fname">{f.name}</span>
-          {#if f.unread > 0 && f.role !== "trash"}<span class="badge">{f.unread}</span>{/if}
-        </button>
+      {#if loadingFolders}<div class="hint"><span class="spinner small"></span> Loading folders…</div>{/if}
+      {#each tree as { f, parent, open } (f.id)}
+        <div class="frow" class:active={f.id === folderId} style:padding-left="{4 + f.depth * 14}px">
+          {#if parent}
+            <button class="chev" title={open ? "Collapse" : "Expand"} onclick={() => toggleFolder(f.id)}>{open ? "▾" : "▸"}</button>
+          {:else}
+            <span class="chev"></span>
+          {/if}
+          <button class="folder" onclick={() => openFolder(f.id)}>
+            <span class="ico">{ICONS[f.role] ?? "📁"}</span>
+            <span class="fname">{f.name}</span>
+            {#if f.unread > 0 && f.role !== "trash"}<span class="badge">{f.unread}</span>{/if}
+          </button>
+        </div>
       {/each}
     </nav>
   </aside>
 
   <section class="list">
     <header>
-      <h2>{folder?.name ?? ""}</h2>
+      <h2>{folder?.name ?? ""}{#if loading || refreshing || loadingFolders}<span class="spinner small" title="Refreshing…"></span>{/if}</h2>
+      {#if loading || refreshing || loadingFolders}<div class="progress"></div>{/if}
       <input bind:this={searchEl} bind:value={search} placeholder="Search  ( / )" onkeydown={(e) => e.key === "Enter" && load(false)} />
     </header>
     <div class="rows" onscroll={onScroll}>
@@ -323,7 +391,7 @@
           <div class="prev">{m.preview}</div>
         </button>
       {/each}
-      {#if loading}<div class="hint"><div class="spinner small"></div></div>{/if}
+      {#if (loading || loadingFolders) && !msgs.length}<div class="hint"><span class="spinner small"></span> Loading messages…</div>{/if}
       {#if !loading && msgs.length === 0 && folderId}<div class="hint">Nothing here.</div>{/if}
     </div>
   </section>
@@ -388,9 +456,12 @@
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
   .compose { padding: 9px; }
   nav { flex: 1; overflow-y: auto; display: grid; gap: 1px; align-content: start; }
-  .folder { display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 10px; border-radius: 6px; }
-  .folder:hover { background: var(--panel2); }
-  .folder.active { background: var(--sel); color: var(--fg); font-weight: 600; }
+  .frow { display: flex; align-items: center; border-radius: 6px; }
+  .frow:hover { background: var(--panel2); }
+  .frow.active { background: var(--sel); font-weight: 600; }
+  .chev { width: 18px; flex: none; background: none; border: none; padding: 0; color: var(--dim); font-size: 11px; text-align: center; }
+  .chev:hover { color: var(--fg); }
+  .folder { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 8px 6px 2px; color: inherit; font-weight: inherit; }
   .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { background: var(--accent); color: var(--accent-fg); border-radius: 10px; padding: 0 7px; font-size: 11px; font-weight: 700; }
   .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-weight: 700; flex: none; text-transform: uppercase; }
@@ -398,7 +469,11 @@
 
   .list { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
   .list header { padding: 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
-  .list h2 { margin: 0; font-size: 17px; }
+  .list h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .list header { position: relative; }
+  .progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; background: transparent; }
+  .progress::after { content: ""; position: absolute; top: 0; bottom: 0; width: 35%; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { from { left: -35%; } to { left: 100%; } }
   .rows { overflow-y: auto; flex: 1; }
   .row { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 9px 14px; border-left: 3px solid transparent; }
   .row:hover { background: var(--panel); }
@@ -412,7 +487,7 @@
   .row.unread .from, .row.unread .subj { font-weight: 700; color: var(--fg); }
   .row.unread .time { color: var(--accent); }
   .flag { color: var(--danger); }
-  .hint { color: var(--dim); text-align: center; padding: 24px; }
+  .hint { color: var(--dim); text-align: center; padding: 24px; display: flex; gap: 10px; align-items: center; justify-content: center; }
 
   main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
   .toolbar { display: flex; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--line); }

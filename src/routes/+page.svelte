@@ -8,6 +8,10 @@
   import Composer from "$lib/Composer.svelte";
   import Settings from "$lib/Settings.svelte";
 
+  // views stay mounted once opened so switching tabs is instant and keeps their state
+  let visited = $state<Record<string, boolean>>({ mail: true });
+  $effect(() => { visited[app.mode] = true; });
+
   // ── Omarchy theme sync ───────────────────────────────────────────
   let lastTheme = "";
   async function syncTheme() {
@@ -77,9 +81,9 @@
 
     <div class="view">
       {#if app.accounts.length}
-        {#if app.mode === "mail"}<MailView />
-        {:else if app.mode === "calendar"}<CalendarView />
-        {:else}<ContactsView />{/if}
+        <div class="pane" class:off={app.mode !== "mail"}><MailView /></div>
+        {#if visited.calendar}<div class="pane" class:off={app.mode !== "calendar"}><CalendarView /></div>{/if}
+        {#if visited.contacts}<div class="pane" class:off={app.mode !== "contacts"}><ContactsView /></div>{/if}
       {/if}
       {#if app.settings || !app.accounts.length}<Settings />{/if}
     </div>
@@ -109,6 +113,8 @@
   .rail button.on { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
   .grow { flex: 1; }
   .view { position: relative; min-width: 0; min-height: 0; }
+  .pane { position: absolute; inset: 0; }
+  .pane.off { display: none; }
   .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; box-shadow: 0 6px 24px #0008; max-width: 70vw; display: flex; gap: 12px; align-items: center; z-index: 100; }
   .toast.bad { border-color: var(--danger); color: var(--danger); }
 </style>
