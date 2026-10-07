@@ -298,18 +298,33 @@
   let frameDoc = $derived.by(() => {
     if (!selected) return "";
     const img = loadImages ? "img-src data: https: http:" : "img-src data:";
+    // Keep message scripts blocked even though WebKit needs the iframe's
+    // allow-scripts token for event listeners installed by this parent page.
     const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; ${img}">`;
     const base = `<style>html{background:#fff;color:#1b1b1f}body{margin:16px;font:14px/1.5 system-ui,sans-serif;word-wrap:break-word}img{max-width:100%;height:auto}pre{white-space:pre-wrap}</style>`;
     return `<!doctype html><html><head><meta charset="utf-8">${csp}<base target="_blank">${base}</head><body>${selected.html}</body></html>`;
   });
 
+  function externalHref(href: string): string | null {
+    const value = href.trim();
+    if (/^\/\//.test(value)) return `https:${value}`;
+    if (!/^(https?|mailto):/i.test(value)) return null;
+    try { return new URL(value).href; } catch { return null; }
+  }
+
   function hookLinks() {
-    frameEl?.contentDocument?.addEventListener("click", (e) => {
-      const a = (e.target as HTMLElement).closest?.("a") as HTMLAnchorElement | null;
-      if (!a) return;
+    const doc = frameEl?.contentDocument;
+    if (!doc) return;
+    doc.addEventListener("click", (e) => {
+      const target = e.target as Node | null;
+      const element = target?.nodeType === Node.ELEMENT_NODE ? target as Element : target?.parentElement;
+      const a = element?.closest("a[href]");
+      const href = externalHref(a?.getAttribute("href") ?? "");
+      if (!href) return;
       e.preventDefault();
-      if (/^(https?|mailto):/i.test(a.href)) openUrl(a.href).catch(fail);
-    });
+      e.stopImmediatePropagation();
+      openUrl(href).catch(fail);
+    }, { capture: true });
   }
 
   // ── keyboard ─────────────────────────────────────────────────────
@@ -449,7 +464,7 @@
           <div class="banner">Remote images are blocked to protect your privacy. <button onclick={() => (loadImages = true)}>Load images</button></div>
         {/if}
       </div>
-      <iframe bind:this={frameEl} title="message" sandbox="allow-same-origin" srcdoc={frameDoc} onload={hookLinks}></iframe>
+      <iframe bind:this={frameEl} title="message" sandbox="allow-same-origin allow-scripts" srcdoc={frameDoc} onload={hookLinks}></iframe>
     {:else}
       <div class="empty">
         <div class="logo">✉</div>
